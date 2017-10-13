@@ -4,6 +4,7 @@
 # SF_PASSWORD_MASTER
 # SF_SERVERURL_PACKAGING
 
+
 # Setup variables for branch naming conventions using env overrides if set
 if [ "$MASTER_BRANCH" == "" ]; then
     export MASTER_BRANCH='master'
@@ -17,6 +18,9 @@ fi
 if [ "$PREFIX_RELEASE" == "" ]; then
     export PREFIX_RELEASE='release/'
 fi
+if [ "$PREFIX_RELEASE_BETA" == "" ]; then
+    export PREFIX_RELEASE_BETA='releaseBETA/'
+fi
 
 # Determine build type and setup Salesforce credentials
 if [[ $CI_BRANCH == $MASTER_BRANCH ]]; then
@@ -26,7 +30,9 @@ elif [[ $CI_BRANCH == $PREFIX_FEATURE* ]]; then
 elif [[ $CI_BRANCH == $PREFIX_BETA* ]]; then
     BUILD_TYPE='beta'
 elif [[ $CI_BRANCH == $PREFIX_RELEASE* ]]; then
-    BUILD_TYPE='release'    
+    BUILD_TYPE='release'
+elif [[ $CI_BRANCH == $PREFIX_RELEASE_BETA* ]]; then
+    BUILD_TYPE='releaseBETA'       
 fi
 
 if [ "$BUILD_TYPE" == "" ]; then
@@ -147,7 +153,7 @@ if [ $BUILD_TYPE == "master" ]; then
         # Get org credentials from env
         export SF_USERNAME=$SF_USERNAME_MASTER
         export SF_PASSWORD=$SF_PASSWORD_MASTER
-        export SF_SERVERURL=$SF_SERVERURL_MASTER
+        export SF_SERVERURL=$SF_SERVERURL_MASTER		
         echo "Got org credentials for master org from env"
         
         # Deploy to master org
@@ -162,7 +168,32 @@ if [ $BUILD_TYPE == "master" ]; then
         #cd clone2
         runAntTarget deployCI
         if [[ $? != 0 ]]; then exit 1; fi
-
+		
+		if [ "$SF_USERNAME_TEST" != "" ]; then
+			echo "-----------------------------------------------------------------"
+			echo "ant deployCI - Deploy to test org"
+			echo "-----------------------------------------------------------------"
+							
+			export SF_USERNAME=$SF_USERNAME_TEST
+			export SF_PASSWORD=$SF_PASSWORD_TEST
+			export SF_SERVERURL=$SF_SERVERURL_TEST		
+			echo "Got org credentials for test org from env"        
+			runAntTarget deployWithoutTest
+			if [[ $? != 0 ]]; then exit 1; fi
+		fi
+		
+		# Merge master commit to all open feature branches
+		# echo
+		# echo "-----------------------------------------------------------------"
+		# echo "Merge commit to all open feature branches"
+		# echo "-----------------------------------------------------------------"
+		# echo
+		# echo "Installing python dependencies"
+		# export PACKAGE=`grep 'cumulusci.package.name.managed=' cumulusci.properties | sed -e 's/cumulusci.package.name.managed *= *//g'`
+		# export BUILD_COMMIT="$CI_COMMIT_ID"
+		
+		# python $CUMULUSCI_PATH/ci/github/merge_master_to_feature.py
+		
     else
         echo
         echo "-----------------------------------------------------------------"
@@ -187,165 +218,174 @@ if [ $BUILD_TYPE == "master" ]; then
         export APEX_TEST_NAME_EXCLUDE=$APEX_TEST_NAME_EXCLUDE_CUMULUSCI
     fi
 
-    # Get org credentials from env
-    export SF_USERNAME=$SF_USERNAME_PACKAGING
-    export SF_PASSWORD=$SF_PASSWORD_PACKAGING
-    export SF_SERVERURL=$SF_SERVERURL_PACKAGING
-    echo "Got org credentials for packaging org from env"
+	
+	if [ "$SF_USERNAME_PACKAGING" != "" ]; then
+
+		# Get org credentials from env
+		export SF_USERNAME=$SF_USERNAME_PACKAGING
+		export SF_PASSWORD=$SF_PASSWORD_PACKAGING
+		export SF_SERVERURL=$SF_SERVERURL_PACKAGING
+		echo "Got org credentials for packaging org from env"
     
-    # Deploy to packaging org
-    echo
-    echo "-----------------------------------------------------------------"
-    echo "ant deployCIPackageOrg - Deploy to packaging org"
-    echo "-----------------------------------------------------------------"
-    echo
+		# Deploy to packaging org
+		echo
+		echo "-----------------------------------------------------------------"
+		echo "ant deployCIPackageOrg - Deploy to packaging org"
+		echo "-----------------------------------------------------------------"
+		echo
 
-    #echo "Running deployCIPackageOrg from /home/rof/clone"
-    #cd /home/rof/clone
-    runAntTarget deployCIPackageOrg
-    if [[ $? != 0 ]]; then exit 1; fi
+		#echo "Running deployCIPackageOrg from /home/rof/clone"
+		#cd /home/rof/clone
+		runAntTarget deployCIPackageOrg
+		if [[ $? != 0 ]]; then exit 1; fi
 
-    
-    #echo
-    #echo "-----------------------------------------------------------------"
-    #echo "Waiting on background jobs to complete"
-    #echo "-----------------------------------------------------------------"
-    #echo
-    #waitOnBackgroundJobs
-    #if [ $? != 0 ]; then exit 1; fi
-    
-    # Upload beta package
-    echo
-    echo "-----------------------------------------------------------------"
-    echo "Uploading beta managed package via Selenium"
-    echo "-----------------------------------------------------------------"
-    echo
+		
+		#echo
+		#echo "-----------------------------------------------------------------"
+		#echo "Waiting on background jobs to complete"
+		#echo "-----------------------------------------------------------------"
+		#echo
+		#waitOnBackgroundJobs
+		#if [ $? != 0 ]; then exit 1; fi
+		
+		# Upload beta package
+		echo
+		echo "-----------------------------------------------------------------"
+		echo "Uploading beta managed package via Selenium"
+		echo "-----------------------------------------------------------------"
+		echo
 
-    echo "Installing python dependencies"
-    export PACKAGE=`grep 'cumulusci.package.name.managed=' cumulusci.properties | sed -e 's/cumulusci.package.name.managed *= *//g'`
-    # Default to cumulusci.package.name if cumulusci.package.name.managed is not defined
-    if [ "$PACKAGE" == "" ]; then
-        export PACKAGE=`grep 'cumulusci.package.name=' cumulusci.properties | sed -e 's/cumulusci.package.name *= *//g'`
-    fi
-    echo "Using package $PACKAGE"
-    export BUILD_NAME="$PACKAGE Build $CI_BUILD_NUMBER"
-    export BUILD_WORKSPACE=`pwd`
-    export BUILD_COMMIT="$CI_COMMIT_ID"
-    pip install --upgrade selenium
-    pip install --upgrade requests
+		echo "Installing python dependencies"
+		export PACKAGE=`grep 'cumulusci.package.name.managed=' cumulusci.properties | sed -e 's/cumulusci.package.name.managed *= *//g'`
+		# Default to cumulusci.package.name if cumulusci.package.name.managed is not defined
+		if [ "$PACKAGE" == "" ]; then
+			export PACKAGE=`grep 'cumulusci.package.name=' cumulusci.properties | sed -e 's/cumulusci.package.name *= *//g'`
+		fi
+		echo "Using package $PACKAGE"
+		export BUILD_NAME="$PACKAGE Build $CI_BUILD_NUMBER"
+		export BUILD_WORKSPACE=`pwd`
+		export BUILD_COMMIT="$CI_COMMIT_ID"
+		pip install --upgrade selenium
+		pip install --upgrade requests
 
-    echo 
-    echo
-    echo "Running package_upload.py"
-    echo
-    python $CUMULUSCI_PATH/ci/package_upload.py
-    if [[ $? -ne 0 ]]; then exit 1; fi
- 
-    # Test beta
-    echo
-    echo "-----------------------------------------------------------------"
-    echo "ant deployManagedBeta - Install beta and test in beta org"
-    echo "-----------------------------------------------------------------"
-    echo
+		echo 
+		echo
+		echo "Running package_upload.py"
+		echo
+		python $CUMULUSCI_PATH/ci/package_upload.py
+		if [[ $? -ne 0 ]]; then exit 1; fi
+	 
+		# Test beta
+		echo
+		echo "-----------------------------------------------------------------"
+		echo "ant deployManagedBeta - Install beta and test in beta org"
+		echo "-----------------------------------------------------------------"
+		echo
 
-    # Set the APEX_TEST_NAME_* environment variables for the build type
-    if [ "$APEX_TEST_NAME_MATCH_PACKAGING" != "" ]; then
-        export APEX_TEST_NAME_MATCH=$APEX_TEST_NAME_MATCH_PACKAGING
-    elif [ "$APEX_TEST_NAME_MATCH_GLOBAL" != "" ]; then
-        export APEX_TEST_NAME_MATCH=$APEX_TEST_NAME_MATCH_GLOBAL
-    else
-        export APEX_TEST_NAME_MATCH=$APEX_TEST_NAME_MATCH_CUMULUSCI
-    fi
-    if [ "$APEX_TEST_NAME_EXCLUDE_PACKAGING" != "" ]; then
-        export APEX_TEST_NAME_EXCLUDE=$APEX_TEST_NAME_EXCLUDE_PACKAGING
-    elif [ "$APEX_TEST_NAME_EXCLUDE_GLOBAL" != "" ]; then
-        export APEX_TEST_NAME_EXCLUDE=$APEX_TEST_NAME_EXCLUDE_GLOBAL
-    else
-        export APEX_TEST_NAME_EXCLUDE=$APEX_TEST_NAME_EXCLUDE_CUMULUSCI
-    fi
+		# Set the APEX_TEST_NAME_* environment variables for the build type
+		if [ "$APEX_TEST_NAME_MATCH_PACKAGING" != "" ]; then
+			export APEX_TEST_NAME_MATCH=$APEX_TEST_NAME_MATCH_PACKAGING
+		elif [ "$APEX_TEST_NAME_MATCH_GLOBAL" != "" ]; then
+			export APEX_TEST_NAME_MATCH=$APEX_TEST_NAME_MATCH_GLOBAL
+		else
+			export APEX_TEST_NAME_MATCH=$APEX_TEST_NAME_MATCH_CUMULUSCI
+		fi
+		if [ "$APEX_TEST_NAME_EXCLUDE_PACKAGING" != "" ]; then
+			export APEX_TEST_NAME_EXCLUDE=$APEX_TEST_NAME_EXCLUDE_PACKAGING
+		elif [ "$APEX_TEST_NAME_EXCLUDE_GLOBAL" != "" ]; then
+			export APEX_TEST_NAME_EXCLUDE=$APEX_TEST_NAME_EXCLUDE_GLOBAL
+		else
+			export APEX_TEST_NAME_EXCLUDE=$APEX_TEST_NAME_EXCLUDE_CUMULUSCI
+		fi
 
-    export SF_USERNAME=$SF_USERNAME_BETA
-    export SF_PASSWORD=$SF_PASSWORD_BETA
-    export SF_SERVERURL=$SF_SERVERURL_BETA
-    echo "Got org credentials for beta org from env"
-    export PACKAGE_VERSION=`grep PACKAGE_VERSION package.properties | sed -e 's/PACKAGE_VERSION=//g'`
-    echo "Attempting install of $PACKAGE_VERSION"
+		export SF_USERNAME=$SF_USERNAME_BETA
+		export SF_PASSWORD=$SF_PASSWORD_BETA
+		export SF_SERVERURL=$SF_SERVERURL_BETA
+		echo "Got org credentials for beta org from env"
+		export PACKAGE_VERSION=`grep PACKAGE_VERSION package.properties | sed -e 's/PACKAGE_VERSION=//g'`
+		echo "Attempting install of $PACKAGE_VERSION"
 
-    tries=0
-    while [ $tries -lt $PACKAGE_AVAILABLE_RETRY_COUNT ]; do
-        tries=$[tries + 1]
-        sleep $PACKAGE_AVAILABLE_DELAY
-        echo
-        echo "-----------------------------------------------------------------"
-        echo "ant deployManagedBeta - Attempt $tries of $PACKAGE_AVAILABLE_RETRY_COUNT"
-        echo "-----------------------------------------------------------------"
-        echo
-        runAntTarget deployManagedBeta
-        if [[ $? -eq 0 ]]; then break; fi
-    done
-    if [[ $? -ne 0 ]]; then exit 1; fi
+		tries=0
+		while [ $tries -lt $PACKAGE_AVAILABLE_RETRY_COUNT ]; do
+			tries=$[tries + 1]
+			sleep $PACKAGE_AVAILABLE_DELAY
+			echo
+			echo "-----------------------------------------------------------------"
+			echo "ant deployManagedBeta - Attempt $tries of $PACKAGE_AVAILABLE_RETRY_COUNT"
+			echo "-----------------------------------------------------------------"
+			echo
+			runAntTarget deployManagedBeta
+			if [[ $? -eq 0 ]]; then break; fi
+		done
+		if [[ $? -ne 0 ]]; then exit 1; fi
 
-    echo
-    echo "-----------------------------------------------------------------"
-    echo "ant runAllTests: Testing $PACKAGE_VERSION in beta org"
-    echo "-----------------------------------------------------------------"
-    echo
-    runAntTarget runAllTestsManaged
-    if [[ $? -ne 0 ]]; then exit 1; fi
-    
-    if [ "$GITHUB_USERNAME" != "" ]; then   
-        # Create GitHub Release
-        echo
-        echo "-----------------------------------------------------------------"
-        echo "Creating GitHub Release $PACKAGE_VERSION"
-        echo "-----------------------------------------------------------------"
-        echo
-        python $CUMULUSCI_PATH/ci/github/create_release.py
+		echo
+		echo "-----------------------------------------------------------------"
+		echo "ant runAllTests: Testing $PACKAGE_VERSION in beta org"
+		echo "-----------------------------------------------------------------"
+		echo
+		runAntTarget runAllTestsManaged
+		if [[ $? -ne 0 ]]; then exit 1; fi
+		
+		if [ "$GITHUB_USERNAME" != "" ]; then   
+			# Create GitHub Release
+			echo
+			echo "-----------------------------------------------------------------"
+			echo "Creating GitHub Release $PACKAGE_VERSION"
+			echo "-----------------------------------------------------------------"
+			echo
+			python $CUMULUSCI_PATH/ci/github/create_release.py
 
-        # Add release notes
-        echo
-        echo "-----------------------------------------------------------------"
-        echo "Generating Release Notes for $PACKAGE_VERSION"
-        echo "-----------------------------------------------------------------"
-        echo
-        pip install --upgrade PyGithub==1.25.1
-        export CURRENT_REL_TAG=`grep CURRENT_REL_TAG release.properties | sed -e 's/CURRENT_REL_TAG=//g'`
-        echo "Generating release notes for tag $CURRENT_REL_TAG"
-        python $CUMULUSCI_PATH/ci/github/release_notes.py
-    
-    
-        # Merge master commit to all open feature branches
-        echo
-        echo "-----------------------------------------------------------------"
-        echo "Merge commit to all open feature branches"
-        echo "-----------------------------------------------------------------"
-        echo
-        python $CUMULUSCI_PATH/ci/github/merge_master_to_feature.py
-    else
-        echo
-        echo "-----------------------------------------------------------------"
-        echo "Skipping GitHub Releaseand master to feature merge because the"
-        echo "environment variable GITHUB_USERNAME is not configured."
-        echo "-----------------------------------------------------------------"
-        echo
-    fi
+			# Add release notes
+			echo
+			echo "-----------------------------------------------------------------"
+			echo "Generating Release Notes for $PACKAGE_VERSION"
+			echo "-----------------------------------------------------------------"
+			echo
+			pip install --upgrade PyGithub==1.25.1
+			export CURRENT_REL_TAG=`grep CURRENT_REL_TAG release.properties | sed -e 's/CURRENT_REL_TAG=//g'`
+			echo "Generating release notes for tag $CURRENT_REL_TAG"
+			python $CUMULUSCI_PATH/ci/github/release_notes.py
+		
+		
+			# Merge master commit to all open feature branches
+			echo
+			echo "-----------------------------------------------------------------"
+			echo "Merge commit to all open feature branches"
+			echo "-----------------------------------------------------------------"
+			echo
+			python $CUMULUSCI_PATH/ci/github/merge_master_to_feature.py
+		else
+			echo
+			echo "-----------------------------------------------------------------"
+			echo "Skipping GitHub Releaseand master to feature merge because the"
+			echo "environment variable GITHUB_USERNAME is not configured."
+			echo "-----------------------------------------------------------------"
+			echo
+		fi
 
-    # If environment variables are configured for mrbelvedere, publish the beta
-    if [ "$MRBELVEDERE_BASE_URL" != "" ]; then
-        echo
+		# If environment variables are configured for mrbelvedere, publish the beta
+		if [ "$MRBELVEDERE_BASE_URL" != "" ]; then
+			echo
+			echo "-----------------------------------------------------------------"
+			echo "Publishing $PACKAGE_VERSION to mrbelvedere installer"
+			echo "-----------------------------------------------------------------"
+			echo
+			export NAMESPACE=`grep 'cumulusci.package.namespace *=' cumulusci.properties | sed -e 's/cumulusci\.package\.namespace *= *//g'`
+			export PROPERTIES_PATH='version.properties'
+			export BETA='true'
+			echo "Checking out $CURRENT_REL_TAG"
+			git fetch --tags origin
+			git checkout $CURRENT_REL_TAG
+			python $CUMULUSCI_PATH/ci/mrbelvedere_update_dependencies.py
+		fi
+	else
+		echo
         echo "-----------------------------------------------------------------"
-        echo "Publishing $PACKAGE_VERSION to mrbelvedere installer"
+        echo "No packaging org credentials, skipping packaging org deployment "
         echo "-----------------------------------------------------------------"
-        echo
-        export NAMESPACE=`grep 'cumulusci.package.namespace *=' cumulusci.properties | sed -e 's/cumulusci\.package\.namespace *= *//g'`
-        export PROPERTIES_PATH='version.properties'
-        export BETA='true'
-        echo "Checking out $CURRENT_REL_TAG"
-        git fetch --tags origin
-        git checkout $CURRENT_REL_TAG
-        python $CUMULUSCI_PATH/ci/mrbelvedere_update_dependencies.py
-    fi
-    
+        echo		
+	fi
 
 # Feature branch commit, build and test in local unmanaged package
 elif [ $BUILD_TYPE == "feature" ]; then
@@ -366,11 +406,11 @@ elif [ $BUILD_TYPE == "feature" ]; then
     fi
     
     # Get org credentials from env
-    export SF_USERNAME=$SF_USERNAME_FEATURE
+    export SF_USERNAME=$SF_USERNAME_FEATURE'_'$(date +"%M")
     export SF_PASSWORD=$SF_PASSWORD_FEATURE
     export SF_SERVERURL=$SF_SERVERURL_FEATURE
     
-    echo "Got org credentials for feature org from env"
+    echo "Got org credentials for feature org from env: "  + $SF_USERNAME
     
     # Deploy to feature org
     echo "Running ant deployCI"
@@ -401,5 +441,22 @@ elif [ $BUILD_TYPE == "release" ]; then
     
     # Deploy to packaging org
     runAntTarget deployCIPackageOrg
+    if [[ $? != 0 ]]; then exit 1; fi
+# Prod tag build, deploy and test in packaging org
+elif [ $BUILD_TYPE == "releaseBETA" ]; then
+    echo
+    echo "-----------------------------------------------------------------"
+    echo "ant deploNoTestBETA: Deploy releaseBeta to packaging org"
+    echo "-----------------------------------------------------------------"
+    echo
+    # Get org credentials from env
+    export SF_USERNAME=$SF_USERNAME_PACKAGING
+    export SF_PASSWORD=$SF_PASSWORD_PACKAGING
+    export SF_SERVERURL=$SF_SERVERURL_PACKAGING
+    
+    echo "Got org credentials for packaging org from env"
+    
+    # Deploy to packaging org
+    runAntTarget deploNoTestBETA -Dsf.deploy.BETA.username=marc.albaladejo@packaging.s2bet -Dsf.deploy.BETA.password=10Ab**** -Dsf.serverurl=https://login.salesforce.com
     if [[ $? != 0 ]]; then exit 1; fi
 fi
