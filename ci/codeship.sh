@@ -446,7 +446,7 @@ elif [ $BUILD_TYPE == "release" ]; then
 elif [ $BUILD_TYPE == "releaseBETA" ]; then
     echo
     echo "-----------------------------------------------------------------"
-    echo "ant deploNoTestBETA: Deploy releaseBeta to packaging org"
+    echo "ant deployNoTestBETA: Deploy releaseBeta to packaging org"
     echo "-----------------------------------------------------------------"
     echo
     # Get org credentials from env
@@ -457,6 +457,6 @@ elif [ $BUILD_TYPE == "releaseBETA" ]; then
     echo "Got org credentials for packaging org from env"
     
     # Deploy to packaging org
-    runAntTarget deploNoTestBETA -Dsf.deploy.BETA.username=marc.albaladejo@packaging.s2bet -Dsf.deploy.BETA.password=10Ab**** -Dsf.serverurl=https://login.salesforce.com
+    runAntTarget deployNoTestBETA -Dsf.deploy.BETA.username=marc.albaladejo@packaging.s2bet -Dsf.deploy.BETA.password=10Ab**** -Dsf.serverurl=https://login.salesforce.com
     if [[ $? != 0 ]]; then exit 1; fi
 fi
