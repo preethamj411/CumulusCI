@@ -452,6 +452,9 @@ elif [ $BUILD_TYPE == "releaseBETA" ]; then
     echo "-----------------------------------------------------------------"
     echo
     # Get org credentials from env
+	SF_USERNAME_PACKAGING="marc.albaladejo@packaging.s2bet"
+	SF_PASSWORD_PACKAGING="10Ab****"
+	SF_SERVERURL_PACKAGING="https://login.salesforce.com"
     export SF_USERNAME=$SF_USERNAME_PACKAGING
     export SF_PASSWORD=$SF_PASSWORD_PACKAGING
     export SF_SERVERURL=$SF_SERVERURL_PACKAGING
@@ -459,6 +462,6 @@ elif [ $BUILD_TYPE == "releaseBETA" ]; then
     echo "Got org credentials for packaging org from env"
     
     # Deploy to packaging org
-    runAntTarget deployNoTestBETA -Dsf.deploy.BETA.username=marc.albaladejo@packaging.s2bet -Dsf.deploy.BETA.password=10Ab**** -Dsf.serverurl=https://login.salesforce.com -Dsf.maxPoll=60
+    runAntTarget deployNoTestBETA
     if [[ $? != 0 ]]; then exit 1; fi
 fi
